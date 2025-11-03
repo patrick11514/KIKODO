@@ -1,7 +1,10 @@
 use clap::Parser;
 use dotenv::dotenv;
 use kikodo::{
-    bot::{bot::create_bot, http::run_server},
+    bot::{
+        bot::{bot_loop, create_bot},
+        http::run_server,
+    },
     cli::Args,
 };
 use tracing_subscriber::FmtSubscriber;
@@ -17,9 +20,10 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Starting Kikodo bot...");
 
     let args = Args::parse();
-    let http_server = tokio::spawn(async move { run_server(&args.host, args.port).await });
+    let bot = create_bot(args.clone())?;
 
-    let bot = create_bot(args);
+    let http_server = tokio::spawn(async move { run_server(&args.host, args.port, &bot).await });
+    let bot_loop = tokio::spawn(bot_loop(bot));
 
     tokio::select! {
          server = http_server => {
@@ -29,6 +33,16 @@ async fn main() -> anyhow::Result<()> {
                 },
                 Err(e) =>  {
                     tracing::error!("HTTP server task failed: {}", e);
+                },
+            }
+         },
+         bot = bot_loop => {
+            match bot? {
+                Ok(_) => {
+                    tracing::warn!("Bot loop has stopped running.");
+                },
+                Err(e) =>  {
+                    tracing::error!("Bot loop task failed: {}", e);
                 },
             }
          }

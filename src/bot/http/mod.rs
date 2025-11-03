@@ -9,8 +9,11 @@ use tokio::net::TcpListener;
 mod structs;
 use structs::WebhookEvent;
 
-pub async fn run_server(host: &str, port: u16) -> anyhow::Result<()> {
+use crate::bot::bot::Bot;
+
+pub async fn run_server(host: &str, port: u16, bot: &Bot) -> anyhow::Result<()> {
     let router: Router = Router::new()
+        .with_state(bot)
         .route("/", get(slash))
         .route("/webhook", post(webhook));
 
